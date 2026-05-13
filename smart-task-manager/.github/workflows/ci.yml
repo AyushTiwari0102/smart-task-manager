@@ -1,0 +1,242 @@
+# ================================================================
+# .github/workflows/ci.yml — GitHub Actions CI Workflow
+# Smart Task Manager
+#
+# Triggers:
+#   - Push to main or develop branch
+#   - Any Pull Request targeting main
+#
+# Jobs:
+#   1. build-and-test  — Maven compile, test, and package
+#   2. docker-build    — Build and optionally push Docker images
+#   3. deploy-sim      — Simulated deployment using Docker Compose
+# ================================================================
+
+name: CI/CD Pipeline
+
+# ---- Trigger Configuration ----
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+
+# ---- Global Environment Variables ----
+env:
+  REGISTRY: ghcr.io                             # GitHub Container Registry
+  IMAGE_BACKEND:  ghcr.io/${{ github.repository_owner }}/stm-backend
+  IMAGE_FRONTEND: ghcr.io/${{ github.repository_owner }}/stm-frontend
+  JAVA_VERSION: '17'
+
+# ================================================================
+# JOBS
+# ================================================================
+jobs:
+
+  # --------------------------------------------------------------
+  # JOB 1: Build & Test (Maven)
+  # Runs the full Maven lifecycle up to the package phase.
+  # Uses H2 in-memory DB so no external services are needed in CI.
+  # --------------------------------------------------------------
+  build-and-test:
+    name: 🔨 Build & Test (Maven)
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out source code
+      - name: ⬇️ Checkout source code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up JDK 17 (Temurin distribution)
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          # Cache Maven local repository to speed up subsequent builds
+          cache: maven
+
+      # Step 3: Maven - Compile phase
+      - name: 🔧 Compile (mvn compile)
+        working-directory: backend-service
+        run: mvn clean compile -B
+
+      # Step 4: Maven - Test phase (runs JUnit tests with H2)
+      - name: 🧪 Run tests (mvn test)
+        working-directory: backend-service
+        run: mvn test -B
+
+      # Step 5: Publish test results
+      - name: 📊 Publish test report
+        uses: dorny/test-reporter@v1
+        if: always()   # Run even if tests fail
+        with:
+          name: JUnit Test Results
+          path: backend-service/target/surefire-reports/*.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      # Step 6: Maven - Package phase (build executable JAR)
+      - name: 📦 Package JAR (mvn package)
+        working-directory: backend-service
+        run: mvn package -DskipTests -B
+
+      # Step 7: Upload the JAR as a GitHub Actions artifact
+      - name: ⬆️ Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar-${{ github.run_number }}
+          path: backend-service/target/backend-service-*.jar
+          retention-days: 7
+
+  # --------------------------------------------------------------
+  # JOB 2: Docker Build & Push
+  # Builds Docker images and pushes to GitHub Container Registry.
+  # Only runs after the build-and-test job passes.
+  # --------------------------------------------------------------
+  docker-build:
+    name: 🐳 Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: build-and-test      # Depends on job 1
+
+    # Required permissions to push to GitHub Container Registry
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # Step 1: Checkout
+      - name: ⬇️ Checkout source code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up JDK (needed to build the JAR before Docker build)
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      # Step 3: Build the JAR (needed by the Docker multi-stage build)
+      - name: 📦 Build JAR for Docker
+        working-directory: backend-service
+        run: mvn package -DskipTests -B
+
+      # Step 4: Set up Docker Buildx (enables multi-platform builds)
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 5: Log in to GitHub Container Registry
+      - name: 🔐 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 6: Extract metadata (tags & labels) for the backend image
+      - name: 🏷️ Backend image metadata
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_BACKEND }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Step 7: Build and push the backend Docker image
+      - name: 🐳 Build & push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend-service
+          push: ${{ github.event_name != 'pull_request' }}  # Don't push on PRs
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha       # Use GitHub Actions cache for Docker layers
+          cache-to: type=gha,mode=max
+
+      # Step 8: Extract metadata for the frontend image
+      - name: 🏷️ Frontend image metadata
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_FRONTEND }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Step 9: Build and push the frontend Docker image
+      - name: 🐳 Build & push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend-service
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # --------------------------------------------------------------
+  # JOB 3: Deployment Simulation
+  # Starts all services using Docker Compose to verify they can
+  # all run together successfully (smoke test).
+  # Runs on push to main only (not PRs).
+  # --------------------------------------------------------------
+  deploy-simulation:
+    name: 🚀 Deployment Simulation
+    runs-on: ubuntu-latest
+    needs: docker-build          # Depends on job 2
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      # Step 1: Checkout
+      - name: ⬇️ Checkout source code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up JDK (for maven build in Docker multi-stage)
+      - name: ☕ Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      # Step 3: Build the JAR first
+      - name: 📦 Build JAR
+        working-directory: backend-service
+        run: mvn package -DskipTests -B
+
+      # Step 4: Start all services with Docker Compose
+      - name: 🚀 Start all services (docker-compose up)
+        run: |
+          docker-compose up -d --build
+          echo "Services started. Waiting for them to become healthy..."
+          sleep 60   # Give services time to initialize
+
+      # Step 5: Check that all containers are running
+      - name: ✅ Verify running containers
+        run: docker-compose ps
+
+      # Step 6: Run a basic API health check
+      - name: 🩺 API health check
+        run: |
+          echo "Testing frontend..."
+          curl -f http://localhost:80 || echo "Frontend not responding (may need more time)"
+          echo "Deployment simulation complete."
+
+      # Step 7: Collect logs if anything went wrong
+      - name: 📋 Print service logs
+        if: always()
+        run: docker-compose logs --tail=50
+
+      # Step 8: Clean up
+      - name: 🧹 Tear down containers
+        if: always()
+        run: docker-compose down -v

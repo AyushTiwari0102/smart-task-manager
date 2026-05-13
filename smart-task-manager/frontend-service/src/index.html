@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Smart Task Manager - A modern microservices-based task management application with real-time updates and priority tracking.">
+    <title>Smart Task Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== AUTH SCREEN ===== -->
+<div id="auth-screen" class="screen active">
+    <div class="auth-bg">
+        <div class="auth-orb orb-1"></div>
+        <div class="auth-orb orb-2"></div>
+        <div class="auth-orb orb-3"></div>
+    </div>
+    <div class="auth-card glass">
+        <div class="brand">
+            <div class="brand-icon">✦</div>
+            <h1 class="brand-name">Smart Task</h1>
+        </div>
+        <p class="brand-tagline">Organize. Execute. Deliver.</p>
+
+        <!-- Tab Toggle -->
+        <div class="tab-group" role="tablist">
+            <button id="tab-login" class="tab active" onclick="switchTab('login')" aria-selected="true">Sign In</button>
+            <button id="tab-register" class="tab" onclick="switchTab('register')" aria-selected="false">Register</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" class="auth-form" onsubmit="handleLogin(event)">
+            <div class="field-group">
+                <label for="login-email">Email</label>
+                <input id="login-email" type="email" placeholder="you@example.com" required autocomplete="email">
+            </div>
+            <div class="field-group">
+                <label for="login-password">Password</label>
+                <input id="login-password" type="password" placeholder="••••••••" required autocomplete="current-password">
+            </div>
+            <div id="login-error" class="form-error hidden"></div>
+            <button type="submit" id="login-btn" class="btn-primary">
+                <span class="btn-text">Sign In</span>
+                <span class="btn-spinner hidden">⟳</span>
+            </button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" class="auth-form hidden" onsubmit="handleRegister(event)">
+            <div class="field-group">
+                <label for="reg-name">Full Name</label>
+                <input id="reg-name" type="text" placeholder="Ayush Tiwari" required minlength="2">
+            </div>
+            <div class="field-group">
+                <label for="reg-email">Email</label>
+                <input id="reg-email" type="email" placeholder="you@example.com" required autocomplete="email">
+            </div>
+            <div class="field-group">
+                <label for="reg-password">Password</label>
+                <input id="reg-password" type="password" placeholder="Min 6 characters" required minlength="6">
+            </div>
+            <div id="reg-error" class="form-error hidden"></div>
+            <button type="submit" id="reg-btn" class="btn-primary">
+                <span class="btn-text">Create Account</span>
+                <span class="btn-spinner hidden">⟳</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ===== DASHBOARD SCREEN ===== -->
+<div id="dashboard-screen" class="screen hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar glass">
+        <div class="sidebar-brand">
+            <div class="brand-icon">✦</div>
+            <span>Smart Task</span>
+        </div>
+        <nav class="sidebar-nav">
+            <button class="nav-item active" onclick="filterTasks(null)" id="nav-all">
+                <span class="nav-icon">◉</span> All Tasks
+            </button>
+            <button class="nav-item" onclick="filterTasks('TODO')" id="nav-todo">
+                <span class="nav-icon todo-dot">●</span> To Do
+            </button>
+            <button class="nav-item" onclick="filterTasks('IN_PROGRESS')" id="nav-inprogress">
+                <span class="nav-icon progress-dot">●</span> In Progress
+            </button>
+            <button class="nav-item" onclick="filterTasks('DONE')" id="nav-done">
+                <span class="nav-icon done-dot">●</span> Done
+            </button>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-pill">
+                <div class="user-avatar" id="user-avatar-text">A</div>
+                <div class="user-info">
+                    <span id="sidebar-username">User</span>
+                    <small id="sidebar-email">user@email.com</small>
+                </div>
+            </div>
+            <button class="btn-logout" onclick="logout()" title="Sign out">⏻</button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="top-header">
+            <div>
+                <h2 id="view-title">All Tasks</h2>
+                <p id="task-count-label" class="subtitle">Loading...</p>
+            </div>
+            <button class="btn-primary" onclick="openModal()" id="add-task-btn">
+                <span>＋</span> New Task
+            </button>
+        </header>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid" id="stats-grid">
+            <div class="stat-card glass" id="stat-total">
+                <div class="stat-value">—</div>
+                <div class="stat-label">Total Tasks</div>
+            </div>
+            <div class="stat-card glass stat-todo" id="stat-todo">
+                <div class="stat-value">—</div>
+                <div class="stat-label">To Do</div>
+            </div>
+            <div class="stat-card glass stat-progress" id="stat-progress">
+                <div class="stat-value">—</div>
+                <div class="stat-label">In Progress</div>
+            </div>
+            <div class="stat-card glass stat-done" id="stat-done">
+                <div class="stat-value">—</div>
+                <div class="stat-label">Done</div>
+            </div>
+        </div>
+
+        <!-- Task List -->
+        <div id="task-list" class="task-list">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading tasks...</p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- ===== TASK MODAL ===== -->
+<div id="task-modal" class="modal-overlay hidden" onclick="closeModalOnOverlay(event)">
+    <div class="modal glass" role="dialog" aria-labelledby="modal-title">
+        <div class="modal-header">
+            <h3 id="modal-title">New Task</h3>
+            <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
+        </div>
+        <form id="task-form" onsubmit="handleSaveTask(event)">
+            <input type="hidden" id="task-id">
+            <div class="field-group">
+                <label for="task-title">Title *</label>
+                <input id="task-title" type="text" placeholder="What needs to be done?" required maxlength="200">
+            </div>
+            <div class="field-group">
+                <label for="task-desc">Description</label>
+                <textarea id="task-desc" placeholder="Add more details..." rows="3" maxlength="1000"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="field-group">
+                    <label for="task-priority">Priority</label>
+                    <select id="task-priority">
+                        <option value="LOW">🟢 Low</option>
+                        <option value="MEDIUM" selected>🟡 Medium</option>
+                        <option value="HIGH">🔴 High</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label for="task-status">Status</label>
+                    <select id="task-status">
+                        <option value="TODO">To Do</option>
+                        <option value="IN_PROGRESS">In Progress</option>
+                        <option value="DONE">Done</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field-group">
+                <label for="task-due">Due Date</label>
+                <input id="task-due" type="datetime-local">
+            </div>
+            <div id="modal-error" class="form-error hidden"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn-primary" id="save-task-btn">Save Task</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== DELETE CONFIRM ===== -->
+<div id="confirm-overlay" class="modal-overlay hidden" onclick="closeConfirm()">
+    <div class="modal confirm-modal glass" onclick="event.stopPropagation()">
+        <div class="confirm-icon">🗑️</div>
+        <h3>Delete Task?</h3>
+        <p>This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeConfirm()">Cancel</button>
+            <button class="btn-danger" id="confirm-delete-btn" onclick="confirmDelete()">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast notification -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

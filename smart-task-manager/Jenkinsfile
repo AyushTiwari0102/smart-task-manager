@@ -1,0 +1,268 @@
+// ================================================================
+// Jenkinsfile — Smart Task Manager CI/CD Pipeline
+//
+// Pipeline stages:
+//   1. Checkout      — Pull source code from GitHub
+//   2. Build         — Compile Java source with Maven
+//   3. Test          — Run unit/integration tests with Maven
+//   4. Package       — Package as executable JAR
+//   5. Docker Build  — Build Docker images for all services
+//   6. Deploy        — Start all containers with Docker Compose
+//   7. Post Actions  — Notify success/failure
+//
+// Declarative Pipeline syntax is used throughout.
+// ================================================================
+
+pipeline {
+
+    // Run on any available Jenkins agent
+    agent any
+
+    // ============================================================
+    // ENVIRONMENT VARIABLES
+    // ============================================================
+    environment {
+        // Docker Hub image names (replace 'ayushtiwari' with your Docker Hub username)
+        IMAGE_BACKEND  = "ayushtiwari/stm-backend"
+        IMAGE_FRONTEND = "ayushtiwari/stm-frontend"
+        IMAGE_TAG      = "${env.BUILD_NUMBER}"   // Tag images with Jenkins build number
+
+        // Docker Hub credentials stored in Jenkins Credentials Manager
+        DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
+
+        // Project workspace path
+        COMPOSE_FILE = "docker-compose.yml"
+    }
+
+    // ============================================================
+    // BUILD OPTIONS
+    // ============================================================
+    options {
+        // Keep only the last 10 builds to save disk space
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        // Fail the build if it runs longer than 30 minutes
+        timeout(time: 30, unit: 'MINUTES')
+        // Add timestamps to console output
+        timestamps()
+    }
+
+    // ============================================================
+    // STAGES
+    // ============================================================
+    stages {
+
+        // ----------------------------------------------------------
+        // STAGE 1: Checkout
+        // Pulls the latest code from the connected GitHub repository.
+        // Jenkins is configured to poll GitHub or receive webhooks.
+        // ----------------------------------------------------------
+        stage('Checkout') {
+            steps {
+                echo '=== Stage 1: Checking out source code ==='
+                // checkout scm automatically uses the repo configured in Jenkins job
+                checkout scm
+                echo "Branch: ${env.GIT_BRANCH}"
+                echo "Commit: ${env.GIT_COMMIT}"
+            }
+        }
+
+        // ----------------------------------------------------------
+        // STAGE 2: Build
+        // Uses the Maven wrapper to compile the Java source code.
+        // Maven lifecycle phase: compile
+        // ----------------------------------------------------------
+        stage('Build') {
+            steps {
+                echo '=== Stage 2: Building with Maven (compile phase) ==='
+                dir('backend-service') {
+                    sh 'mvn clean compile -B'
+                    // -B = batch mode (no interactive prompts, clean CI output)
+                }
+            }
+        }
+
+        // ----------------------------------------------------------
+        // STAGE 3: Test
+        // Runs all JUnit tests using Maven Surefire plugin.
+        // Uses H2 in-memory DB — no external services required.
+        // Maven lifecycle phase: test
+        // ----------------------------------------------------------
+        stage('Test') {
+            steps {
+                echo '=== Stage 3: Running unit & integration tests ==='
+                dir('backend-service') {
+                    sh 'mvn test -B'
+                }
+            }
+            post {
+                always {
+                    // Publish JUnit test results in Jenkins UI
+                    junit allowEmptyResults: true,
+                          testResults: 'backend-service/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        // ----------------------------------------------------------
+        // STAGE 4: Package
+        // Creates the executable fat JAR using Maven.
+        // Maven lifecycle phase: package
+        // Output: backend-service/target/backend-service-1.0.0.jar
+        // ----------------------------------------------------------
+        stage('Package') {
+            steps {
+                echo '=== Stage 4: Packaging as executable JAR (Maven package) ==='
+                dir('backend-service') {
+                    sh 'mvn package -DskipTests -B'
+                }
+                // Archive the JAR as a Jenkins build artifact
+                archiveArtifacts artifacts: 'backend-service/target/*.jar',
+                                 fingerprint: true,
+                                 allowEmptyArchive: false
+            }
+        }
+
+        // ----------------------------------------------------------
+        // STAGE 5: Docker Build
+        // Builds Docker images for both backend and frontend services.
+        // Each image is tagged with the Jenkins BUILD_NUMBER for traceability.
+        // ----------------------------------------------------------
+        stage('Docker Build') {
+            steps {
+                echo '=== Stage 5: Building Docker images ==='
+                script {
+                    // Build backend image
+                    sh """
+                        docker build \
+                            -t ${IMAGE_BACKEND}:${IMAGE_TAG} \
+                            -t ${IMAGE_BACKEND}:latest \
+                            ./backend-service
+                    """
+                    // Build frontend image
+                    sh """
+                        docker build \
+                            -t ${IMAGE_FRONTEND}:${IMAGE_TAG} \
+                            -t ${IMAGE_FRONTEND}:latest \
+                            ./frontend-service
+                    """
+                    echo "Images built: ${IMAGE_BACKEND}:${IMAGE_TAG}, ${IMAGE_FRONTEND}:${IMAGE_TAG}"
+                }
+            }
+        }
+
+        // ----------------------------------------------------------
+        // STAGE 6: Push to Registry (optional — comment out if no registry)
+        // Pushes built images to Docker Hub.
+        // Requires 'docker-hub-credentials' in Jenkins Credentials.
+        // ----------------------------------------------------------
+        stage('Push to Registry') {
+            when {
+                // Only push on main/master branch builds
+                anyOf {
+                    branch 'main'
+                    branch 'master'
+                }
+            }
+            steps {
+                echo '=== Stage 6: Pushing images to Docker Hub ==='
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        sh "docker push ${IMAGE_BACKEND}:${IMAGE_TAG}"
+                        sh "docker push ${IMAGE_BACKEND}:latest"
+                        sh "docker push ${IMAGE_FRONTEND}:${IMAGE_TAG}"
+                        sh "docker push ${IMAGE_FRONTEND}:latest"
+                    }
+                }
+            }
+        }
+
+        // ----------------------------------------------------------
+        // STAGE 7: Deploy
+        // Uses Docker Compose to bring up the full microservices stack.
+        // Pulls the freshly built images and restarts changed containers.
+        // ----------------------------------------------------------
+        stage('Deploy') {
+            steps {
+                echo '=== Stage 7: Deploying with Docker Compose ==='
+                script {
+                    // Bring down any running stack (graceful teardown)
+                    sh 'docker-compose down --remove-orphans || true'
+
+                    // Start all services in detached mode
+                    sh """
+                        docker-compose up -d \
+                            --build \
+                            --force-recreate
+                    """
+
+                    // Wait for backend health check to pass
+                    sh '''
+                        echo "Waiting for backend to be healthy..."
+                        for i in $(seq 1 30); do
+                            STATUS=$(docker inspect --format="{{.State.Health.Status}}" stm-backend 2>/dev/null || echo "unknown")
+                            echo "Backend health: $STATUS (attempt $i/30)"
+                            if [ "$STATUS" = "healthy" ]; then
+                                echo "Backend is healthy!"
+                                break
+                            fi
+                            sleep 10
+                        done
+                    '''
+
+                    // Show running containers
+                    sh 'docker-compose ps'
+                }
+            }
+        }
+
+    } // end stages
+
+    // ============================================================
+    // POST-BUILD ACTIONS
+    // Runs after all stages complete, regardless of result.
+    // ============================================================
+    post {
+
+        success {
+            echo """
+            ╔══════════════════════════════════════╗
+            ║  ✅  BUILD SUCCESSFUL                ║
+            ║  Smart Task Manager deployed!        ║
+            ║  Frontend: http://localhost:80       ║
+            ║  Backend API: http://localhost:8080  ║
+            ╚══════════════════════════════════════╝
+            """
+            // Email notification on success (configure SMTP in Jenkins)
+            // emailext(
+            //     subject: "✅ Build #${BUILD_NUMBER} PASSED",
+            //     body: "Smart Task Manager deployed successfully.",
+            //     to: "ayushtiwaribr45@gmail.com"
+            // )
+        }
+
+        failure {
+            echo """
+            ╔══════════════════════════════════════╗
+            ║  ❌  BUILD FAILED                    ║
+            ║  Check console output for errors     ║
+            ╚══════════════════════════════════════╝
+            """
+            // Clean up on failure to avoid stale containers
+            sh 'docker-compose down --remove-orphans || true'
+            // emailext(
+            //     subject: "❌ Build #${BUILD_NUMBER} FAILED",
+            //     body: "Build failed. Check: ${BUILD_URL}",
+            //     to: "ayushtiwaribr45@gmail.com"
+            // )
+        }
+
+        always {
+            echo '=== Post: Cleaning up dangling Docker images ==='
+            sh 'docker image prune -f || true'
+        }
+
+        unstable {
+            echo '⚠️ Build is unstable — some tests may have failed.'
+        }
+    }
+}

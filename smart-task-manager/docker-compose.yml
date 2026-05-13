@@ -1,0 +1,174 @@
+# ================================================================
+# docker-compose.yml — Smart Task Manager
+#
+# Defines 4 microservices:
+#   1. db       - MySQL 8 database
+#   2. redis    - Redis 7 cache / session store
+#   3. backend  - Spring Boot REST API
+#   4. frontend - Nginx serving HTML/CSS/JS + API proxy
+#
+# Usage:
+#   docker-compose up --build       # Start all services
+#   docker-compose down -v          # Stop and remove volumes
+#   docker-compose logs -f backend  # Tail backend logs
+# ================================================================
+
+version: '3.9'
+
+services:
+
+  # ------------------------------------------------------------------
+  # SERVICE 1: MySQL Database
+  # Stores all user and task data persistently via a named volume.
+  # ------------------------------------------------------------------
+  db:
+    image: mysql:8.0
+    container_name: stm-db
+    restart: unless-stopped
+
+    # Environment variables configure the MySQL instance on first boot
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: smarttaskdb
+      MYSQL_USER: ${DB_USERNAME:-stmuser}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-stmpass}
+
+    # Persist database data even when the container is removed
+    volumes:
+      - db_data:/var/lib/mysql
+      # Run SQL init script on first startup
+      - ./db-service/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    # Only accessible inside the Docker network (not exposed to host)
+    networks:
+      - stm-network
+
+    # Health check: retry mysqladmin ping until MySQL is ready
+    # The backend service will wait for this health check before starting
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-root123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ------------------------------------------------------------------
+  # SERVICE 2: Redis Cache
+  # Used for JWT session caching and future rate-limiting.
+  # ------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: stm-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+    # Persist Redis data using AOF (Append Only File)
+    volumes:
+      - redis_data:/data
+
+    # Only accessible inside the Docker network
+    networks:
+      - stm-network
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ------------------------------------------------------------------
+  # SERVICE 3: Backend (Spring Boot REST API)
+  # Connects to both db and redis via Docker's internal DNS.
+  # ------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend-service
+      dockerfile: Dockerfile
+    container_name: stm-backend
+    restart: unless-stopped
+
+    # Inject environment variables to override application.properties
+    environment:
+      # Database connection (uses Docker service name 'db' as hostname)
+      DB_USERNAME: ${DB_USERNAME:-stmuser}
+      DB_PASSWORD: ${DB_PASSWORD:-stmpass}
+      # Redis connection (uses Docker service name 'redis' as hostname)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # JWT — OVERRIDE THIS WITH A STRONG SECRET IN PRODUCTION
+      JWT_SECRET: ${JWT_SECRET:-SuperSecretKey_ChangeInProd_256BitsMin!!}
+      # Spring active profile
+      SPRING_PROFILES_ACTIVE: docker
+
+    # Expose port 8080 to host for direct API testing
+    ports:
+      - "8080:8080"
+
+    # Connect to internal Docker network
+    networks:
+      - stm-network
+
+    # Wait for db and redis to be healthy before starting
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ------------------------------------------------------------------
+  # SERVICE 4: Frontend (Nginx + Static Files)
+  # Proxies /api/* requests to the backend container.
+  # ------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend-service
+      dockerfile: Dockerfile
+    container_name: stm-frontend
+    restart: unless-stopped
+
+    # Expose port 80 to the host — this is the main app entry point
+    ports:
+      - "80:80"
+
+    # Connect to internal Docker network (needs to reach 'backend')
+    networks:
+      - stm-network
+
+    # Wait for backend to start (nginx needs to be able to proxy to it)
+    depends_on:
+      - backend
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# ================================================================
+# NETWORKS
+# stm-network: isolated bridge network for inter-service communication.
+# All services can reach each other by container service name (e.g. 'db', 'redis').
+# ================================================================
+networks:
+  stm-network:
+    driver: bridge
+    name: stm-network
+
+# ================================================================
+# VOLUMES
+# Named volumes persist data across container restarts and rebuilds.
+# ================================================================
+volumes:
+  db_data:
+    driver: local
+    name: stm-db-data
+  redis_data:
+    driver: local
+    name: stm-redis-data
