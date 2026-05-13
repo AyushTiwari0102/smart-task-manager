@@ -5,8 +5,6 @@ import com.smarttask.model.Task.Priority;
 import com.smarttask.model.Task.Status;
 import com.smarttask.model.User;
 import com.smarttask.service.TaskService;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,10 +29,14 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/tasks")
-@RequiredArgsConstructor
 public class TaskController {
 
     private final TaskService taskService;
+
+    // Constructor injection (replaces @RequiredArgsConstructor)
+    public TaskController(TaskService taskService) {
+        this.taskService = taskService;
+    }
 
     /** GET /api/tasks?status=TODO|IN_PROGRESS|DONE */
     @GetMapping
@@ -95,14 +97,24 @@ public class TaskController {
         }
     }
 
-    // ---- Request DTO ----
+    // ---- Request DTO (plain Java, no Lombok) ----
 
-    @Data
     public static class TaskRequest {
         private String title;
         private String description;
         private Status status;
         private Priority priority;
         private LocalDateTime dueDate;
+
+        public String getTitle()              { return title; }
+        public void setTitle(String v)        { this.title = v; }
+        public String getDescription()        { return description; }
+        public void setDescription(String v)  { this.description = v; }
+        public Status getStatus()             { return status; }
+        public void setStatus(Status v)       { this.status = v; }
+        public Priority getPriority()         { return priority; }
+        public void setPriority(Priority v)   { this.priority = v; }
+        public LocalDateTime getDueDate()     { return dueDate; }
+        public void setDueDate(LocalDateTime v){ this.dueDate = v; }
     }
 }

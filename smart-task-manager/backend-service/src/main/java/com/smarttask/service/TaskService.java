@@ -5,7 +5,6 @@ import com.smarttask.model.Task.Priority;
 import com.smarttask.model.Task.Status;
 import com.smarttask.model.User;
 import com.smarttask.repository.TaskRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,25 +15,21 @@ import java.util.Map;
 
 /**
  * TaskService - Business logic for task CRUD operations.
- *
- * All task operations are scoped to the authenticated user — users cannot
- * access or modify tasks that belong to other users. This is enforced by
- * filtering on userId throughout every query.
+ * All operations are scoped to the authenticated user for security.
  */
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class TaskService {
 
     private final TaskRepository taskRepository;
 
+    // Constructor injection (replaces @RequiredArgsConstructor)
+    public TaskService(TaskRepository taskRepository) {
+        this.taskRepository = taskRepository;
+    }
+
     /**
-     * Get all tasks for the authenticated user.
-     * Optionally filter by status.
-     *
-     * @param user   the authenticated user
-     * @param status optional status filter (null = return all)
-     * @return list of tasks
+     * Get all tasks for the authenticated user, optionally filtered by status.
      */
     @Transactional(readOnly = true)
     public List<Task> getTasksForUser(User user, Status status) {
@@ -46,13 +41,6 @@ public class TaskService {
 
     /**
      * Create a new task for the authenticated user.
-     *
-     * @param user        the owner
-     * @param title       task title (required)
-     * @param description optional description
-     * @param priority    task priority level
-     * @param dueDate     optional due date
-     * @return the persisted task
      */
     public Task createTask(User user, String title, String description,
                            Priority priority, LocalDateTime dueDate) {
@@ -68,34 +56,20 @@ public class TaskService {
 
     /**
      * Update an existing task — only the owner can update.
-     *
-     * @param taskId      the task ID
-     * @param user        the requesting user (must be owner)
-     * @param title       updated title
-     * @param description updated description
-     * @param status      updated status
-     * @param priority    updated priority
-     * @param dueDate     updated due date
-     * @return the updated task
      */
     public Task updateTask(Long taskId, User user, String title, String description,
                            Status status, Priority priority, LocalDateTime dueDate) {
         Task task = getTaskByIdForUser(taskId, user);
-
-        if (title != null) task.setTitle(title);
+        if (title != null)       task.setTitle(title);
         if (description != null) task.setDescription(description);
-        if (status != null) task.setStatus(status);
-        if (priority != null) task.setPriority(priority);
-        if (dueDate != null) task.setDueDate(dueDate);
-
+        if (status != null)      task.setStatus(status);
+        if (priority != null)    task.setPriority(priority);
+        if (dueDate != null)     task.setDueDate(dueDate);
         return taskRepository.save(task);
     }
 
     /**
      * Delete a task — only the owner can delete.
-     *
-     * @param taskId the task ID
-     * @param user   the requesting user
      */
     public void deleteTask(Long taskId, User user) {
         Task task = getTaskByIdForUser(taskId, user);
@@ -104,10 +78,6 @@ public class TaskService {
 
     /**
      * Get dashboard statistics for the authenticated user.
-     * Returns counts of tasks per status.
-     *
-     * @param user the authenticated user
-     * @return map of status → count
      */
     @Transactional(readOnly = true)
     public Map<String, Object> getDashboardStats(User user) {

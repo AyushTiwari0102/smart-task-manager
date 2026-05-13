@@ -3,7 +3,6 @@ package com.smarttask.service;
 import com.smarttask.config.JwtUtil;
 import com.smarttask.model.User;
 import com.smarttask.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -20,12 +19,20 @@ import java.util.Map;
  * - Issue JWT tokens upon successful authentication
  */
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+
+    // Constructor injection (replaces @RequiredArgsConstructor)
+    public AuthService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtUtil jwtUtil) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
+    }
 
     /**
      * Register a new user.
@@ -33,16 +40,14 @@ public class AuthService {
      * @param name     display name
      * @param email    unique email (used as login ID)
      * @param password plain-text password (will be hashed)
-     * @return JWT token for the new user
-     * @throws IllegalArgumentException if email already exists
+     * @return JWT token + user info map
      */
     public Map<String, Object> register(String name, String email, String password) {
-        // Check for duplicate email
         if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email already registered: " + email);
         }
 
-        // Build and persist the new user with hashed password
+        // Build and persist user with BCrypt-hashed password
         User user = User.builder()
                 .name(name)
                 .email(email)
@@ -50,7 +55,6 @@ public class AuthService {
                 .build();
         user = userRepository.save(user);
 
-        // Issue a JWT for immediate login after registration
         String token = jwtUtil.generateToken(email);
         return buildAuthResponse(user, token);
     }
@@ -60,8 +64,7 @@ public class AuthService {
      *
      * @param email    registered email
      * @param password plain-text password to verify
-     * @return JWT token and user info
-     * @throws IllegalArgumentException if credentials are invalid
+     * @return JWT token + user info map
      */
     public Map<String, Object> login(String email, String password) {
         User user = userRepository.findByEmail(email)

@@ -1,12 +1,10 @@
 package com.smarttask.config;
 
-import com.smarttask.model.User;
 import com.smarttask.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,15 +19,18 @@ import java.util.List;
  * JwtAuthFilter - Intercepts every HTTP request to validate the JWT in the
  * Authorization header. If the token is valid, populates the SecurityContext
  * so downstream controllers know who is calling.
- *
- * Registered in SecurityConfig as a filter before UsernamePasswordAuthenticationFilter.
  */
 @Component
-@RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+
+    // Constructor injection — replaces @RequiredArgsConstructor
+    public JwtAuthFilter(JwtUtil jwtUtil, UserRepository userRepository) {
+        this.jwtUtil = jwtUtil;
+        this.userRepository = userRepository;
+    }
 
     @Override
     protected void doFilterInternal(

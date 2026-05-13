@@ -5,8 +5,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,16 +22,21 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/auth")
-@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
+
+    // Constructor injection (replaces @RequiredArgsConstructor)
+    public AuthController(AuthService authService) {
+        this.authService = authService;
+    }
 
     /** POST /api/auth/register */
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
         try {
-            Map<String, Object> response = authService.register(req.getName(), req.getEmail(), req.getPassword());
+            Map<String, Object> response = authService.register(
+                    req.getName(), req.getEmail(), req.getPassword());
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -53,30 +56,33 @@ public class AuthController {
         }
     }
 
-    // ---- Request DTOs ----
+    // ---- Request DTOs (plain Java, no Lombok) ----
 
-    @Data
     public static class RegisterRequest {
-        @NotBlank
-        @Size(min = 2, max = 80)
+        @NotBlank @Size(min = 2, max = 80)
         private String name;
-
-        @Email
-        @NotBlank
+        @Email @NotBlank
         private String email;
-
-        @NotBlank
-        @Size(min = 6, max = 100)
+        @NotBlank @Size(min = 6, max = 100)
         private String password;
+
+        public String getName()          { return name; }
+        public void setName(String v)    { this.name = v; }
+        public String getEmail()         { return email; }
+        public void setEmail(String v)   { this.email = v; }
+        public String getPassword()      { return password; }
+        public void setPassword(String v){ this.password = v; }
     }
 
-    @Data
     public static class LoginRequest {
-        @Email
-        @NotBlank
+        @Email @NotBlank
         private String email;
-
         @NotBlank
         private String password;
+
+        public String getEmail()         { return email; }
+        public void setEmail(String v)   { this.email = v; }
+        public String getPassword()      { return password; }
+        public void setPassword(String v){ this.password = v; }
     }
 }

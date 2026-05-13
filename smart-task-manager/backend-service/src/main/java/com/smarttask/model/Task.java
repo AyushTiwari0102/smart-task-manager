@@ -3,10 +3,6 @@ package com.smarttask.model;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
@@ -16,67 +12,77 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "tasks")
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class Task {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Short task title */
-    @NotBlank
-    @Size(min = 1, max = 200)
+    @NotBlank @Size(min = 1, max = 200)
     @Column(nullable = false)
     private String title;
 
-    /** Detailed description (optional) */
     @Size(max = 1000)
     @Column(length = 1000)
     private String description;
 
-    /** Current status of the task */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    @Builder.Default
     private Status status = Status.TODO;
 
-    /** Priority level */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    @Builder.Default
     private Priority priority = Priority.MEDIUM;
 
-    /** When the task was created */
     @Column(nullable = false, updatable = false)
-    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    /** Last update timestamp */
-    @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    /** Due date (optional) */
     private LocalDateTime dueDate;
 
-    /** Owner of this task */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /** Update the updatedAt before every merge */
+    public enum Status   { TODO, IN_PROGRESS, DONE }
+    public enum Priority { LOW, MEDIUM, HIGH }
+
+    // ---------- Lifecycle ----------
     @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
+    public void preUpdate() { this.updatedAt = LocalDateTime.now(); }
 
-    public enum Status {
-        TODO, IN_PROGRESS, DONE
-    }
+    // ---------- Constructors ----------
+    public Task() {}
 
-    public enum Priority {
-        LOW, MEDIUM, HIGH
+    // ---------- Getters & Setters ----------
+    public Long getId()                         { return id; }
+    public String getTitle()                    { return title; }
+    public void setTitle(String title)          { this.title = title; }
+    public String getDescription()              { return description; }
+    public void setDescription(String desc)     { this.description = desc; }
+    public Status getStatus()                   { return status; }
+    public void setStatus(Status status)        { this.status = status; }
+    public Priority getPriority()               { return priority; }
+    public void setPriority(Priority priority)  { this.priority = priority; }
+    public LocalDateTime getCreatedAt()         { return createdAt; }
+    public LocalDateTime getUpdatedAt()         { return updatedAt; }
+    public LocalDateTime getDueDate()           { return dueDate; }
+    public void setDueDate(LocalDateTime d)     { this.dueDate = d; }
+    public User getUser()                       { return user; }
+    public void setUser(User user)              { this.user = user; }
+
+    // ---------- Builder ----------
+    public static Builder builder() { return new Builder(); }
+
+    public static class Builder {
+        private final Task task = new Task();
+        public Builder title(String v)       { task.title = v; return this; }
+        public Builder description(String v) { task.description = v; return this; }
+        public Builder status(Status v)      { task.status = v; return this; }
+        public Builder priority(Priority v)  { task.priority = v; return this; }
+        public Builder dueDate(LocalDateTime v) { task.dueDate = v; return this; }
+        public Builder user(User v)          { task.user = v; return this; }
+        public Task build()                  { return task; }
     }
 }
