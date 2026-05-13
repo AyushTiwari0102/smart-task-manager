@@ -18,8 +18,8 @@ COPY src/ /usr/share/nginx/html/
 # Expose port 80 (the port nginx listens on inside the container)
 EXPOSE 80
 
-# Health check — makes sure nginx is still serving
+# Health check — uses CMD-SHELL so /bin/sh handles the redirect
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost/ || exit 1
+    CMD curl -f http://localhost/ || exit 1
 
 # Nginx starts automatically as the default CMD in the base image
