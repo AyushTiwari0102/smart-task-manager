@@ -71,9 +71,8 @@ pipeline {
         stage('Build') {
             steps {
                 echo '=== Stage 2: Building with Maven (compile phase) ==='
-                dir('backend-service') {
+                dir('smart-task-manager/backend-service') {
                     sh 'mvn clean compile -B'
-                    // -B = batch mode (no interactive prompts, clean CI output)
                 }
             }
         }
@@ -87,15 +86,14 @@ pipeline {
         stage('Test') {
             steps {
                 echo '=== Stage 3: Running unit & integration tests ==='
-                dir('backend-service') {
+                dir('smart-task-manager/backend-service') {
                     sh 'mvn test -B'
                 }
             }
             post {
                 always {
-                    // Publish JUnit test results in Jenkins UI
                     junit allowEmptyResults: true,
-                          testResults: 'backend-service/target/surefire-reports/*.xml'
+                          testResults: 'smart-task-manager/backend-service/target/surefire-reports/*.xml'
                 }
             }
         }
@@ -109,11 +107,10 @@ pipeline {
         stage('Package') {
             steps {
                 echo '=== Stage 4: Packaging as executable JAR (Maven package) ==='
-                dir('backend-service') {
+                dir('smart-task-manager/backend-service') {
                     sh 'mvn package -DskipTests -B'
                 }
-                // Archive the JAR as a Jenkins build artifact
-                archiveArtifacts artifacts: 'backend-service/target/*.jar',
+                archiveArtifacts artifacts: 'smart-task-manager/backend-service/target/*.jar',
                                  fingerprint: true,
                                  allowEmptyArchive: false
             }
@@ -128,19 +125,17 @@ pipeline {
             steps {
                 echo '=== Stage 5: Building Docker images ==='
                 script {
-                    // Build backend image
                     sh """
                         docker build \
                             -t ${IMAGE_BACKEND}:${IMAGE_TAG} \
                             -t ${IMAGE_BACKEND}:latest \
-                            ./backend-service
+                            ./smart-task-manager/backend-service
                     """
-                    // Build frontend image
                     sh """
                         docker build \
                             -t ${IMAGE_FRONTEND}:${IMAGE_TAG} \
                             -t ${IMAGE_FRONTEND}:latest \
-                            ./frontend-service
+                            ./smart-task-manager/frontend-service
                     """
                     echo "Images built: ${IMAGE_BACKEND}:${IMAGE_TAG}, ${IMAGE_FRONTEND}:${IMAGE_TAG}"
                 }
@@ -170,17 +165,8 @@ pipeline {
             steps {
                 echo '=== Stage 7: Deploying with Docker Compose ==='
                 script {
-                    // Bring down any running stack (graceful teardown)
-                    sh 'docker-compose down --remove-orphans || true'
-
-                    // Start all services in detached mode
-                    sh """
-                        docker-compose up -d \
-                            --build \
-                            --force-recreate
-                    """
-
-                    // Wait for backend health check to pass
+                    sh 'docker-compose -f smart-task-manager/docker-compose.yml down --remove-orphans || true'
+                    sh 'docker-compose -f smart-task-manager/docker-compose.yml up -d --build --force-recreate'
                     sh '''
                         echo "Waiting for backend to be healthy..."
                         for i in $(seq 1 30); do
@@ -193,9 +179,7 @@ pipeline {
                             sleep 10
                         done
                     '''
-
-                    // Show running containers
-                    sh 'docker-compose ps'
+                    sh 'docker-compose -f smart-task-manager/docker-compose.yml ps'
                 }
             }
         }
