@@ -3,6 +3,7 @@ backend-service/target/
 
 # Environment files (contain secrets)
 .env
+.env.*
 
 # IDE files
 .idea/
@@ -16,3 +17,13 @@ Thumbs.db
 
 # Docker
 *.log
+
+# Node / React — DO NOT push these
+node_modules/
+frontend-service/node_modules/
+api-gateway/node_modules/
+frontend-service/dist/
+frontend-service/.vite/
+
+# React build cache
+frontend-service/src/assets/*.png

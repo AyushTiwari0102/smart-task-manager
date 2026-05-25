@@ -1,0 +1,11 @@
+.grid { display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px; }
+.card { border-radius:18px;padding:20px 22px;position:relative;overflow:hidden;cursor:default; }
+.stripe { position:absolute;top:0;left:0;right:0;height:2px;opacity:0;transition:0.2s; }
+.card:hover .stripe { opacity:1; }
+.inner { display:flex;align-items:center;justify-content:space-between; }
+.value { font-size:34px;font-weight:900;letter-spacing:-2px;font-family:var(--mono); }
+.label { font-size:11px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:0.6px;margin-top:4px; }
+.ringWrap { position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center; }
+.ring { width:48px;height:48px; }
+@media(max-width:1100px) { .grid { grid-template-columns:repeat(2,1fr); } }
+@media(max-width:480px)  { .grid { grid-template-columns:1fr 1fr; } }

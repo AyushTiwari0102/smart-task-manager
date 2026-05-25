@@ -1,0 +1,8 @@
+.widget { position:fixed;bottom:24px;right:24px;width:220px;background:rgba(10,10,24,0.96);border:1px solid var(--border);border-radius:18px;padding:16px;z-index:150;box-shadow:0 16px 48px rgba(0,0,0,0.6);backdrop-filter:blur(24px); }
+.top { display:flex;align-items:center;justify-content:space-between;margin-bottom:6px; }
+.label { font-size:11px;font-weight:700;color:var(--accent-2);text-transform:uppercase;letter-spacing:0.5px; }
+.title { font-size:12px;color:var(--text-2);margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.timerWrap { position:relative;width:80px;height:80px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center; }
+.ring { width:80px;height:80px;position:absolute;top:0;left:0; }
+.time { font-size:20px;font-weight:800;font-family:var(--mono);letter-spacing:-1px; }
+.btns { display:flex;align-items:center;justify-content:center;gap:8px; }

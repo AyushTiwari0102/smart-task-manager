@@ -77,7 +77,35 @@ services:
       retries: 5
 
   # ------------------------------------------------------------------
-  # SERVICE 3: Backend (Spring Boot REST API)
+  # SERVICE 3: Node.js / Express API Gateway (BFF)
+  # Handles: REST proxy → Spring Boot, Socket.io real-time events,
+  #          AI priority scoring, XP/gamification logic
+  # ------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: stm-gateway
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8080
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    networks:
+      - stm-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ------------------------------------------------------------------
+  # SERVICE 4: Backend (Spring Boot REST API)
   # Connects to both db and redis via Docker's internal DNS.
   # ------------------------------------------------------------------
   backend:
@@ -116,11 +144,11 @@ services:
         condition: service_healthy
 
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health || exit 1"]
-      interval: 30s
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
       timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 90s
 
   # ------------------------------------------------------------------
   # SERVICE 4: Frontend (Nginx + Static Files)
@@ -141,9 +169,10 @@ services:
     networks:
       - stm-network
 
-    # Wait for backend to start (nginx needs to be able to proxy to it)
+    # Wait for backend and api-gateway to be healthy
     depends_on:
       - backend
+      - api-gateway
 
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]

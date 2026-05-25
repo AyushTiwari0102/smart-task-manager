@@ -1,0 +1,312 @@
+
+================================================================
+        PROJECT SYNOPSIS
+================================================================
+
+Project Title:
+Design and Implementation of a Complete Microservices-Based
+CI/CD DevOps Pipeline — Smart Task Manager
+
+Submitted in partial fulfillment of the requirements of the
+DevOps course.
+
+================================================================
+
+
+1. INTRODUCTION
+----------------------------------------------------------------
+
+This project is a complete DevOps-integrated full-stack web
+application developed using Vanilla HTML/CSS/JavaScript, Java
+Spring Boot, MySQL, Redis, Docker, and Docker Compose. The main
+objective of this project is to demonstrate modern DevOps
+practices along with full-stack application development,
+containerization, and automated CI/CD pipeline integration.
+
+The application is designed as a Smart Task Manager system
+where users can register, log in, and manage their personal
+tasks with priorities, statuses, and due dates through a
+clean and responsive web interface. The system uses JWT-based
+authentication to ensure secure, stateless API communication.
+
+The project integrates frontend, backend, database, and cache
+services using Docker containers and manages them through
+Docker Compose with health checks and inter-service networking.
+It also implements complete CI/CD pipelines using both Jenkins
+and GitHub Actions to automate the build, test, and deployment
+lifecycle.
+
+The project demonstrates practical implementation of DevOps
+concepts such as containerization, multi-stage Docker builds,
+image creation, Docker networking, named volumes, Maven build
+automation, declarative Jenkins pipelines, and GitHub Actions
+workflows.
+
+
+2. OBJECTIVES
+----------------------------------------------------------------
+
+  - To develop a full-stack web application using modern
+    technologies.
+  - To implement containerization using Docker with multi-stage
+    builds.
+  - To integrate frontend, backend, database, and cache services
+    as independent microservices.
+  - To automate the backend build process using Maven through
+    its full lifecycle (compile, test, package).
+  - To manage multi-container applications using Docker Compose
+    with health checks and dependency ordering.
+  - To implement JWT-based stateless authentication using Spring
+    Security.
+  - To implement a complete CI/CD pipeline using Jenkins
+    (declarative pipeline with 7 stages).
+  - To implement a CI/CD workflow using GitHub Actions
+    (3-job pipeline).
+  - To understand the end-to-end DevOps workflow and deployment
+    lifecycle.
+  - To maintain version control using Git and GitHub.
+
+
+3. TECHNOLOGIES USED
+----------------------------------------------------------------
+
+Frontend
+  - HTML5, CSS3, JavaScript (ES6+)
+  - Nginx 1.25 (static file server and API reverse proxy)
+
+Backend
+  - Java 17
+  - Spring Boot 3.2
+  - Spring Security (JWT-based stateless authentication)
+  - Spring Data JPA (ORM)
+  - Spring Data Redis (caching)
+  - Spring Boot Actuator (health endpoints)
+  - Maven 3.9 (build automation)
+
+Database
+  - MySQL 8.0
+
+Cache / Session Store
+  - Redis 7 (Alpine)
+
+Security
+  - JJWT 0.11.5 (JSON Web Tokens)
+  - BCrypt (password hashing, cost factor 12)
+
+DevOps Tools
+  - Docker
+  - Docker Compose
+  - Jenkins (Declarative Pipeline)
+  - GitHub Actions
+  - Git
+  - GitHub
+
+
+4. SYSTEM ARCHITECTURE
+----------------------------------------------------------------
+
+The system follows a four-tier microservices architecture.
+All tiers are deployed as independent Docker containers
+connected through a shared Docker bridge network (stm-network).
+
+  1. Frontend Layer (stm-frontend)
+       - Nginx serves static HTML, CSS, and JavaScript files.
+       - Acts as a reverse proxy, forwarding all /api/* requests
+         to the backend container using Docker's internal DNS.
+       - Exposed on host port 80.
+
+  2. Backend Layer (stm-backend)
+       - Spring Boot REST API handles business logic,
+         authentication, and data access.
+       - Connects to MySQL for persistent storage and Redis
+         for caching.
+       - Exposes /actuator/health for Docker health checks.
+       - Exposed on host port 8080.
+
+  3. Database Layer (stm-db)
+       - MySQL 8 container stores user and task data.
+       - Schema is auto-initialized via init.sql on first boot.
+       - Data persisted using a named Docker volume (stm-db-data).
+       - Not exposed to the host; only accessible internally.
+
+  4. Cache Layer (stm-redis)
+       - Redis 7 (Alpine) used for JWT session caching.
+       - Data persisted with AOF (Append Only File) via a named
+         Docker volume (stm-redis-data).
+       - Not exposed to the host; only accessible internally.
+
+Startup Order (enforced by Docker Compose health checks):
+  stm-db (healthy) --> stm-redis (healthy) --> stm-backend --> stm-frontend
+
+
+5. FEATURES OF THE PROJECT
+----------------------------------------------------------------
+
+  - User Registration and Login with JWT Authentication
+  - BCrypt Password Hashing (never stores plain-text passwords)
+  - Role-Based Access Control (USER / ADMIN roles)
+  - Task Creation with Title, Description, Priority, and Due Date
+  - Task Status Management (To Do, In Progress, Done)
+  - Task Priority Levels (Low, Medium, High)
+  - Task Filtering by Status
+  - Dashboard Statistics (total, to-do, in-progress, done counts)
+  - Edit and Delete Tasks with Ownership Verification
+  - Responsive Glassmorphism Dark-Theme UI
+  - Keyboard Shortcuts (Ctrl+N for new task, Esc to close modal)
+  - REST API with proper HTTP status codes
+  - Nginx Reverse Proxy (frontend proxies API calls to backend)
+  - Persistent Database Storage using Named Volumes
+  - Actuator Health Endpoint (/actuator/health)
+  - Docker Health Checks for all containers
+
+
+6. PROJECT STRUCTURE
+----------------------------------------------------------------
+
+smart-task-manager/
+  |-- docker-compose.yml          (multi-container orchestration)
+  |-- Jenkinsfile                 (declarative CI/CD pipeline)
+  |-- .github/
+  |     |-- workflows/
+  |           |-- ci.yml          (GitHub Actions workflow)
+  |-- backend-service/
+  |     |-- Dockerfile            (multi-stage Docker build)
+  |     |-- pom.xml               (Maven build configuration)
+  |     |-- src/main/java/com/smarttask/
+  |           |-- SmartTaskApplication.java
+  |           |-- config/         (JWT, Security, Filter)
+  |           |-- model/          (User, Task entities)
+  |           |-- repository/     (JPA repositories)
+  |           |-- service/        (business logic)
+  |           |-- controller/     (REST endpoints)
+  |     |-- src/test/             (H2-based integration tests)
+  |-- frontend-service/
+  |     |-- Dockerfile            (Nginx static server)
+  |     |-- nginx.conf            (proxy and routing config)
+  |     |-- src/
+  |           |-- index.html
+  |           |-- style.css
+  |           |-- app.js
+  |-- db-service/
+        |-- init.sql              (MySQL schema + seed data)
+
+
+7. DEVOPS CONCEPTS IMPLEMENTED
+----------------------------------------------------------------
+
+  Docker
+    - Multi-stage Dockerfile for backend (build stage: Maven
+      with JDK 17; runtime stage: slim JRE Alpine image)
+    - Single-stage Dockerfile for frontend (Nginx Alpine)
+    - Non-root user inside containers (security best practice)
+    - Named volumes for data persistence
+    - Bridge network (stm-network) for inter-service communication
+    - Health checks on all four containers
+    - Container dependency ordering with condition: service_healthy
+
+  Maven Build Lifecycle (CO4)
+    - mvn compile  : Compiles all 12 Java source files
+    - mvn test     : Runs JUnit tests using H2 in-memory DB
+    - mvn package  : Packages the executable fat JAR
+    - Plugins used : spring-boot-maven-plugin,
+                     maven-compiler-plugin (Java 17),
+                     maven-surefire-plugin
+
+  Jenkins CI/CD Pipeline (7 Stages)
+    Stage 1 : Checkout (clone from GitHub)
+    Stage 2 : Build    (mvn compile)
+    Stage 3 : Test     (mvn test + JUnit report)
+    Stage 4 : Package  (mvn package -DskipTests)
+    Stage 5 : Docker Build (build backend and frontend images)
+    Stage 6 : Registry Push (push to Docker Hub)
+    Stage 7 : Deploy   (docker-compose up on target server)
+    Post    : Success/Failure notifications
+
+  GitHub Actions CI/CD Workflow (3 Jobs)
+    Job 1 : Build & Test  — Maven compile, test, package;
+                            uploads JAR as artifact
+    Job 2 : Docker Build  — Builds and pushes images to GHCR
+                            (GitHub Container Registry)
+    Job 3 : Deploy Sim    — Starts all services via
+                            docker-compose and runs smoke test
+                            (only on push to main branch)
+
+  Git & GitHub
+    - Feature branch workflow
+    - Meaningful commit messages
+    - .gitignore to exclude build artifacts and secrets
+    - .gitattributes for cross-platform line ending normalization
+
+
+8. REST API ENDPOINTS
+----------------------------------------------------------------
+
+  Authentication (Public)
+    POST /api/auth/register   — Register a new user account
+    POST /api/auth/login      — Login and receive a JWT token
+
+  Tasks (Protected — requires Bearer token)
+    GET    /api/tasks           — List all tasks (optional filter)
+    GET    /api/tasks?status=TODO | IN_PROGRESS | DONE
+    POST   /api/tasks           — Create a new task
+    PUT    /api/tasks/{id}      — Update an existing task
+    DELETE /api/tasks/{id}      — Delete a task
+    GET    /api/tasks/stats     — Dashboard statistics
+
+  Health (Public)
+    GET /actuator/health        — Returns {"status":"UP"}
+
+
+9. ADVANTAGES OF THE PROJECT
+----------------------------------------------------------------
+
+  - Simplified and reproducible deployment process
+  - Platform-independent execution using Docker containers
+  - Stateless authentication enables horizontal scalability
+  - Separation of concerns via independent microservices
+  - Fast development and testing workflow with Docker Compose
+  - Easy environment replication across dev, test, and production
+  - Automated build, test, and deploy cycle via CI/CD pipelines
+  - Data safety through named Docker volumes
+  - Security hardened: non-root containers, BCrypt passwords,
+    JWT authentication, CSRF disabled for REST APIs
+
+
+10. FUTURE ENHANCEMENTS
+----------------------------------------------------------------
+
+  - Kubernetes (K8s) orchestration for auto-scaling
+  - Docker Hub / GHCR automated image publishing
+  - Cloud deployment on AWS (ECS/EKS) or Azure (AKS)
+  - Prometheus and Grafana for monitoring and alerting
+  - React.js frontend migration for richer UI
+  - Email notifications for task due dates
+  - Role-based admin dashboard
+  - File attachment support for tasks
+  - Swagger/OpenAPI documentation for REST API
+  - SonarQube integration for code quality analysis
+
+
+11. CONCLUSION
+----------------------------------------------------------------
+
+This project successfully demonstrates the integration of
+modern DevOps practices with a full-stack microservices web
+application. The Smart Task Manager provides practical
+implementation of Docker containerization, multi-stage image
+builds, multi-container orchestration using Docker Compose,
+Maven build automation across all lifecycle phases, a 7-stage
+declarative Jenkins CI/CD pipeline, and a 3-job GitHub Actions
+workflow.
+
+The project satisfies all course outcomes — CO3 (multi-container
+Docker Compose with dependency configuration), CO4 (Maven
+lifecycle management with plugins), and CO5 (continuous
+integration using GitHub Actions). It provides real-world
+exposure to industry-standard DevOps workflows, deployment
+strategies, and security best practices, making it suitable
+for both academic demonstration and professional portfolio use.
+
+================================================================
+                        END OF SYNOPSIS
+================================================================

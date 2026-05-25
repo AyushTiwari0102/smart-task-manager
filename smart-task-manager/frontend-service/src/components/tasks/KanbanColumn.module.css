@@ -1,0 +1,8 @@
+.col { background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:16px;padding:14px;min-height:200px;transition:0.2s; }
+.over { border-color:var(--col-color);background:rgba(255,255,255,0.04);box-shadow:0 0 20px rgba(124,109,255,0.1); }
+.header { display:flex;align-items:center;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px; }
+.dot { width:9px;height:9px;border-radius:50%;flex-shrink:0; }
+.title { font-size:13px;font-weight:700;flex:1; }
+.count { font-size:11px;font-weight:700;background:rgba(255,255,255,0.07);border-radius:20px;padding:2px 8px;font-family:var(--mono);color:var(--text-2); }
+.cards { display:flex;flex-direction:column;gap:8px; }
+.empty { text-align:center;padding:24px;color:var(--text-3);font-size:13px;border:2px dashed var(--border);border-radius:10px; }

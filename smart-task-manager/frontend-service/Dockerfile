@@ -1,25 +1,33 @@
-# ================================================================
-# Frontend Service Dockerfile
-# Uses Nginx to serve static HTML/CSS/JS files
-# ================================================================
+# Stage 1 — Build React app with Vite
+FROM node:20-alpine AS builder
 
-# Use the official lightweight Nginx Alpine image
+WORKDIR /app
+
+# Install deps first (layer cache)
+COPY package.json ./
+RUN npm install
+
+# Install zustand (Pomodoro state management)
+RUN npm install zustand
+
+# Copy source
+COPY . .
+
+# Build
+RUN npm run build
+
+# Stage 2 — Serve with Nginx
 FROM nginx:1.25-alpine
 
-# Remove the default nginx configuration
-RUN rm /etc/nginx/nginx.conf
+# Copy built assets
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy our custom nginx configuration
+# Copy custom nginx config
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy all static frontend source files into the nginx web root
-COPY src/ /usr/share/nginx/html/
-
-# Expose port 80 (the port nginx listens on inside the container)
 EXPOSE 80
 
-# Health check — uses CMD-SHELL so /bin/sh handles the redirect
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost/ || exit 1
+    CMD wget -qO- http://localhost/health || wget -qO- http://localhost/ || exit 1
 
-# Nginx starts automatically as the default CMD in the base image
+CMD ["nginx", "-g", "daemon off;"]

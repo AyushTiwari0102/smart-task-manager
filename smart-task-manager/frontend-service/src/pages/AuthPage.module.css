@@ -1,0 +1,57 @@
+.screen {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 40% 10%, #16093a 0%, var(--bg) 65%);
+  position: relative; overflow: hidden;
+}
+.orb1,.orb2,.orb3 {
+  position: absolute; border-radius: 50%;
+  filter: blur(90px); opacity: 0.16;
+  animation: float 10s ease-in-out infinite;
+}
+.orb1 { width:520px;height:520px;background:var(--accent);   top:-160px;left:-160px; animation-delay:0s; }
+.orb2 { width:400px;height:400px;background:#e879f9;          bottom:-100px;right:-100px;animation-delay:-4s; }
+.orb3 { width:280px;height:280px;background:#06d6a0;          top:45%;left:55%;animation-delay:-7s; }
+@keyframes float {
+  0%,100% { transform: translate(0,0) scale(1); }
+  33% { transform: translate(22px,-22px) scale(1.06); }
+  66% { transform: translate(-16px,16px) scale(0.94); }
+}
+.card {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 420px;
+  padding: 44px 40px;
+  border-radius: 28px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.65), 0 0 50px rgba(124,109,255,0.1);
+}
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.brandIcon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  box-shadow: 0 6px 20px var(--accent-glow);
+}
+.brandName { font-size: 24px; font-weight: 800; letter-spacing: -0.7px; }
+.accent { color: var(--accent-2); }
+.tagline { color: var(--text-2); font-size: 12px; margin-bottom: 28px; }
+.tabs {
+  display: flex; gap: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px; padding: 4px;
+  margin-bottom: 24px;
+}
+.tab {
+  flex: 1; padding: 9px;
+  border: none; border-radius: 7px;
+  background: transparent; color: var(--text-2);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: 0.18s ease;
+}
+.tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  box-shadow: 0 3px 12px var(--accent-glow);
+}

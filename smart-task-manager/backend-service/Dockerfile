@@ -25,6 +25,9 @@ RUN mvn package -DskipTests -B
 # Use a minimal JRE image (no Maven or JDK) to keep the image small
 FROM eclipse-temurin:17-jre-alpine
 
+# Install wget for the health check (not included in alpine JRE by default)
+RUN apk add --no-cache wget
+
 # Add a non-root user for security best practices
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
