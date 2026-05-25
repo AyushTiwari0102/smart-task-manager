@@ -22,13 +22,10 @@ pipeline {
     // ENVIRONMENT VARIABLES
     // ============================================================
     environment {
-        // Docker Hub image names (replace 'ayushtiwari' with your Docker Hub username)
+        // Docker Hub image names
         IMAGE_BACKEND  = "ayushtiwari/stm-backend"
         IMAGE_FRONTEND = "ayushtiwari/stm-frontend"
-        IMAGE_TAG      = "${env.BUILD_NUMBER}"   // Tag images with Jenkins build number
-
-        // Docker Hub credentials stored in Jenkins Credentials Manager
-        DOCKER_CREDENTIALS = credentials('docker-hub-credentials')
+        IMAGE_TAG      = "${env.BUILD_NUMBER}"
 
         // Project workspace path
         COMPOSE_FILE = "docker-compose.yml"
@@ -151,28 +148,16 @@ pipeline {
         }
 
         // ----------------------------------------------------------
-        // STAGE 6: Push to Registry (optional — comment out if no registry)
-        // Pushes built images to Docker Hub.
-        // Requires 'docker-hub-credentials' in Jenkins Credentials.
+        // STAGE 6: Push to Registry
+        // Skipped until Docker Hub credentials are configured in Jenkins.
+        // To enable: Add 'docker-hub-credentials' in Jenkins > Manage Credentials
         // ----------------------------------------------------------
         stage('Push to Registry') {
             when {
-                // Only push on main/master branch builds
-                anyOf {
-                    branch 'main'
-                    branch 'master'
-                }
+                expression { return false } // set to true once credentials are added
             }
             steps {
-                echo '=== Stage 6: Pushing images to Docker Hub ==='
-                script {
-                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
-                        sh "docker push ${IMAGE_BACKEND}:${IMAGE_TAG}"
-                        sh "docker push ${IMAGE_BACKEND}:latest"
-                        sh "docker push ${IMAGE_FRONTEND}:${IMAGE_TAG}"
-                        sh "docker push ${IMAGE_FRONTEND}:latest"
-                    }
-                }
+                echo '=== Stage 6: Skipped — configure docker-hub-credentials to enable ==='
             }
         }
 
@@ -247,13 +232,6 @@ pipeline {
             ║  Check console output for errors     ║
             ╚══════════════════════════════════════╝
             """
-            // Clean up on failure to avoid stale containers
-            sh 'docker-compose down --remove-orphans || true'
-            // emailext(
-            //     subject: "❌ Build #${BUILD_NUMBER} FAILED",
-            //     body: "Build failed. Check: ${BUILD_URL}",
-            //     to: "ayushtiwaribr45@gmail.com"
-            // )
         }
 
         always {
